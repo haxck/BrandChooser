@@ -83,10 +83,11 @@ button:disabled{opacity:.5;cursor:not-allowed}
    商标类目选择器（按大类分页）
    数据结构: [{ classNo, className, groups:[{g, groupTitle, items:[{code,name}]}] }]
    ============================================================ */
-const data = []          // 全部大类数据
-let selected   = new Map() // 已选：key = classNo-g-code
-let currentCls = null     // 当前正在编辑的类对象
-let curOnly    = false    // 只看已选开关
+const data = new Map()          // 已加载的类：classNo -> 类对象
+let selected   = new Map()     // 已选：key = classNo-g-code
+let currentNo  = null          // 当前正在编辑的大类编号（懒加载）
+let curOnly    = false         // 只看已选开关
+const CLASS_COUNT = 34         // 已知大类总数（不预测，点哪个加载哪个）
 
 const treeEl   = document.getElementById('tree')
 const resEl    = document.getElementById('result')
@@ -95,22 +96,40 @@ const treeCnt  = document.getElementById('treeCount')
 const searchEl = document.getElementById('search')
 const tabsEl   = document.getElementById('tabs')
 const titleEl  = document.getElementById('panelTitle')
+const statusEl = document.getElementById('loadStatus')
 
-const keyOf = (cls,g,code)=> `${cls.classNo}-${g}-${code}`
-const clsKeys = cls => cls.groups.flatMap(gr=>gr.items.map(it=>keyOf(cls,gr.g,it.code)))
+const keyOf = (cno,g,code)=> `${cno}-${g}-${code}`
 
 function applySelect(cls, gr, it, on){
-  const k = keyOf(cls, gr.g, it.code)
+  const k = keyOf(cls.classNo, gr.g, it.code)
   if(on) selected.set(k, {classNo:cls.classNo, className:cls.className, g:gr.g, groupTitle:gr.groupTitle, code:it.code, name:it.name})
   else   selected.delete(k)
   saveSelected()
 }
 
 /* ============================================================
-   本地缓存（刷新 / 关闭页面不丢失）
+   懒加载：点哪个大类才 fetch 哪个大类，已加载的缓存在内存
    ============================================================ */
-const LS_DATA   = 'brand:data:v4'   // 缓存的全部类目数据
-const LS_SELECT = 'brand:select:v4' // 缓存已选小类
+async function openClass(no){
+  if(data.has(no)){ setCurrent(no); renderTree(); renderTabs(); return }
+  statusEl.textContent = `⏳ 加载第${no}类…`
+  let cls=null
+  try{
+    let r = await fetch(`data/${String(no).padStart(2,'0')}.json`)
+    if(!r.ok) r = await fetch(`data/${no}.json`)
+    if(r.ok){ cls = await r.json(); data.set(no, cls) }
+  }catch(e){}
+  if(!cls){ statusEl.textContent=`⚠️ 第${no}类加载失败`; return }
+  statusEl.textContent='✅ 已缓存到内存'
+  setCurrent(no); renderTree(); renderTabs(); renderResult()
+}
+function setCurrent(no){ if(data.has(no)) currentNo = no }
+function curClass(){ return data.get(currentNo) || null }
+
+/* ============================================================
+   本地缓存：仅缓存已选小项（轻量），不缓存大量类目数据
+   ============================================================ */
+const LS_SELECT = 'brand:select:v4'
 
 function saveSelected(){
   try{ localStorage.setItem(LS_SELECT, JSON.stringify([...selected.values()])) }catch(e){}
@@ -126,34 +145,27 @@ function loadSelected(){
     selected = sel
   }catch(e){}
 }
-function saveDataCache(arr){
-  try{ localStorage.setItem(LS_DATA, JSON.stringify(arr)) }catch(e){}
-}
-function readDataCache(){
-  try{
-    const raw = localStorage.getItem(LS_DATA)
-    return raw ? JSON.parse(raw) : null
-  }catch(e){ return null }
-}
 
-/* ---------- Tabs 栏 ---------- */
+/* ---------- Tabs 栏（懒加载：点击才加载） ---------- */
 function renderTabs(){
   tabsEl.innerHTML = ''
-  data.forEach(cls=>{
-    const n = cls.groups.reduce((s,g)=>s+g.items.filter(it=>selected.has(keyOf(cls,g.g,it.code))).length,0)
+  for(let no=1; no<=CLASS_COUNT; no++){
+    // 该大类已选小类数（无需加载该大类即可统计）
+    let n=0
+    for(const v of selected.values()) if(v.classNo===no) n++
     const b = document.createElement('button')
-    b.className = 'tab' + (cls===currentCls?' active':'') + (n>0?' sel':'')
-    b.onclick = ()=>{ currentCls = cls; renderTree(); renderTabs() }
-    b.innerHTML = `<span>第${cls.classNo}类</span>${n?`<span class="cnt">${n}</span>`:''}`
+    b.className = 'tab' + (no===currentNo?' active':'') + (n>0?' sel':'')
+    b.onclick = ()=>{ openClass(no) }
+    b.textContent = `第${no}类` + (n?`(${n})`:'')
     tabsEl.appendChild(b)
-  })
+  }
 }
 
 /* ---------- 当前大类渲染 ---------- */
 function renderTree(){
-  if(!currentCls){ treeEl.innerHTML='<div style="color:#888">无数据</div>'; return }
-  titleEl.textContent = currentCls.className
-  const cls = currentCls
+  const cls = curClass()
+  if(!cls){ treeEl.innerHTML='<div style="color:#888">点上方某个大类开始</div>'; return }
+  titleEl.textContent = cls.className
   const keyword = searchEl.value.trim().toLowerCase()
   let visible = 0
   treeEl.innerHTML = ''
@@ -303,52 +315,17 @@ function refreshButtons(){
   ;['btnJson','btnTxt','btnCsv'].forEach(id=>{ document.getElementById(id).disabled=!on })
 }
 
-/* ---------- 启动：先读缓存（秒开），无缓存再逐个 fetch ---------- */
-function setData(list){
-  data.length=0
-  list.forEach(c=>{ if(c && c.classNo!=null && c.groups) data.push(c) })
-  data.sort((a,b)=>a.classNo-b.classNo)
-}
-function kickRender(){
-  if(!currentCls && data.length) currentCls = data[0]
-  renderTabs(); renderTree(); renderResult()
-}
+/* ---------- 启动：秒开，不预取任何类目 ---------- */
 function boot(){
-  const status = document.getElementById('loadStatus')
-  // 1) 恢复已选
-  loadSelected()
-  // 2) 读数据缓存
-  const cache = readDataCache()
-  if(cache && cache.length){
-    setData(cache)
-    status.textContent = `✅ 已从缓存加载 ${data.length} 个大类`
-    kickRender()
-    return
-  }
-  // 3) 逐个 fetch 34 类目文件
-  ;(async function(){
-    const already={}, list=[]
-    for(let i=1;i<=45;i++){
-      const names=[`${String(i).padStart(2,'0')}.json`, `${i}.json`]
-      for(const f of names){
-        if(already[i])break
-        try{
-          const r=await fetch('data/'+f)
-          if(r.ok){
-            const obj=await r.json()
-            if(obj && obj.classNo!=null && !already[i]){
-              already[i]=1; list.push(obj); saveDataCache(list)
-              status.textContent=`加载 ${i}/45 ⏳`
-            }
-          }
-        }catch(e){}
-      }
-    }
-    setData(list); saveDataCache(data)
-    if(!data.length) status.textContent='⚠️ data/ 无类目文件'
-    else status.textContent=`✅ 已加载 ${data.length} 个大类`
-    kickRender()
-  })()
+  loadSelected()               // 恢复已选（轻量）
+  statusEl.textContent = '✅ 就绪：点击上方大类开始（按需加载）'
+  renderTabs()
+  renderResult()
+  // 若已有已选，默认打开第一个被选的大类方便回看
+  const first = [...selected.values()]
+    .map(v=>v.classNo).sort((a,b)=>a-b)[0]
+  if(first) openClass(first)
+  else renderTree()
 }
 
 // ---- 启动 ----
