@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>商标类目勾选筛选器（按大类分页）</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui, sans-serif}
+body{display:flex;flex-direction:column;height:100vh;padding:12px;gap:12px;background:#f5f7fa}
+.topbar{display:flex;align-items:center;gap:12px;padding:0 4px}
+.topbar h1{font-size:18px;color:#222;white-space:nowrap}
+.topbar .load-status{font-size:12px;color:#888}
+/* 大类 Tab 栏 */
+.tabs{display:flex;flex-wrap:wrap;gap:6px;padding:8px 4px;border-bottom:1px solid #e5e7eb}
+.tab{padding:6px 12px;border:1px solid #d1d5db;border-radius:6px;background:#fff;color:#374151;cursor:pointer;font-size:13px;line-height:1.2;text-align:left}
+.tab:hover{background:#f3f4f6}
+.tab.active{background:#2563eb;color:#fff;border-color:#2563eb}
+.tab .cnt{font-size:11px;opacity:.7;margin-left:4px}
+.tab.sel .dot{color:#22c55e;font-weight:bold}
+.main{display:flex;flex:1;gap:12px;min-height:0}
+.panel{background:#fff;border-radius:8px;padding:16px;overflow:auto}
+.left{width:55%;border:1px solid #e5e7eb}
+.right{width:35%;border:1px solid #e5e7eb}
+.nav{width:12%;border:1px solid #e5e7eb;overflow:auto}
+.panel h3{margin-bottom:12px;color:#222;font-size:15px;display:flex;align-items:center;gap:8px}
+.search{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;margin-bottom:12px}
+.ctrl-bar{margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button{padding:6px 12px;border:none;border-radius:6px;background:#2563eb;color:#fff;cursor:pointer;font-size:13px}
+button:hover{filter:brightness(.95)}
+button.ghost{background:#eef2ff;color:#2563eb;border:1px solid #c7d2fe}
+button.secondary{background:#888}
+button.btn-json{background:#16a34a}
+button.btn-txt{background:#ea580c}
+button.btn-csv{background:#7c3aed}
+button:disabled{opacity:.5;cursor:not-allowed}
+.count{font-size:12px;color:#888;margin-left:auto}
+.tree-item{margin:8px 0}
+.class-title{font-weight:600;cursor:pointer;padding:4px 0;display:flex;gap:6px;align-items:center}
+.group-title{font-weight:500;color:#333;margin:8px 0 4px 18px;display:flex;gap:6px;align-items:center}
+.item{margin-left:34px;padding:3px 0;color:#555;font-size:13px;display:flex;gap:6px;align-items:center}
+.only-selected{font-size:12px;color:#2563eb;cursor:pointer;user-select:none}
+#result ul{list-style:none}
+#result li{padding:2px 0;font-size:13px;display:flex;gap:6px;align-items:center}
+.all-sum{font-size:12px;color:#888;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>🔍 商标类目选勾器</h1>
+  <span class="load-status" id="loadStatus">加载中…</span>
+</div>
+<!-- 按大类分页 Tab -->
+<div class="tabs" id="tabs"></div>
+
+<div class="main">
+  <!-- 左侧：当前大类的分类树 -->
+  <div class="panel left">
+    <h3 id="panelTitle">选择小类</h3>
+    <input class="search" id="search" placeholder="搜索编码 / 名称 / 类似群">
+    <div class="ctrl-bar">
+      <button onclick="clearAll()" class="ghost">清空全部</button>
+      <button onclick="toggleCurOnly()" class="ghost" id="curOnlyBtn">只看已选</button>
+      <span class="count" id="treeCount"></span>
+    </div>
+    <div id="tree"></div>
+  </div>
+
+  <!-- 中间/右侧：导航（可不必要，顶部已有 Tab）占位隐藏 -->
+  <div class="panel right">
+    <h3>✅ 已选类目（全部大类汇总）</h3>
+    <div class="ctrl-bar">
+      <button class="btn-json" id="btnJson" onclick="exportJSON()">⬇ JSON</button>
+      <button class="btn-txt"  id="btnTxt"  onclick="exportTXT()">⬇ TXT</button>
+      <button class="btn-csv"  id="btnCsv"  onclick="exportCSV()">⬇ CSV</button>
+      <button class="secondary" onclick="copyResult()">复制清单</button>
+    </div>
+    <div id="resultCount" class="count"></div>
+    <div id="result"></div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   商标类目选择器（按大类分页）
+   数据结构: [{ classNo, className, groups:[{g, groupTitle, items:[{code,name}]}] }]
+   ============================================================ */
+const data = []          // 全部大类数据
+let selected   = new Map() // 已选：key = classNo-g-code
+let currentCls = null     // 当前正在编辑的类对象
+let curOnly    = false    // 只看已选开关
+
+const treeEl   = document.getElementById('tree')
+const resEl    = document.getElementById('result')
+const countEl  = document.getElementById('resultCount')
+const treeCnt  = document.getElementById('treeCount')
+const searchEl = document.getElementById('search')
+const tabsEl   = document.getElementById('tabs')
+const titleEl  = document.getElementById('panelTitle')
+
+const keyOf = (cls,g,code)=> `${cls.classNo}-${g}-${code}`
+const clsKeys = cls => cls.groups.flatMap(gr=>gr.items.map(it=>keyOf(cls,gr.g,it.code)))
+
+function applySelect(cls, gr, it, on){
+  const k = keyOf(cls, gr.g, it.code)
+  if(on) selected.set(k, {classNo:cls.classNo, className:cls.className, g:gr.g, groupTitle:gr.groupTitle, code:it.code, name:it.name})
+  else   selected.delete(k)
+  saveSelected()
+}
+
+/* ============================================================
+   本地缓存（刷新 / 关闭页面不丢失）
+   ============================================================ */
+const LS_DATA   = 'brand:data:v4'   // 缓存的全部类目数据
+const LS_SELECT = 'brand:select:v4' // 缓存已选小类
+
+function saveSelected(){
+  try{ localStorage.setItem(LS_SELECT, JSON.stringify([...selected.values()])) }catch(e){}
+}
+function loadSelected(){
+  try{
+    const raw = localStorage.getItem(LS_SELECT)
+    if(!raw) return
+    const arr = JSON.parse(raw)
+    if(!Array.isArray(arr)) return
+    const sel = new Map()
+    arr.forEach(it=>{ if(it && it.code!=null && it.classNo!=null) sel.set(`${it.classNo}-${it.g}-${it.code}`, it) })
+    selected = sel
+  }catch(e){}
+}
+function saveDataCache(arr){
+  try{ localStorage.setItem(LS_DATA, JSON.stringify(arr)) }catch(e){}
+}
+function readDataCache(){
+  try{
+    const raw = localStorage.getItem(LS_DATA)
+    return raw ? JSON.parse(raw) : null
+  }catch(e){ return null }
+}
+
+/* ---------- Tabs 栏 ---------- */
+function renderTabs(){
+  tabsEl.innerHTML = ''
+  data.forEach(cls=>{
+    const n = cls.groups.reduce((s,g)=>s+g.items.filter(it=>selected.has(keyOf(cls,g.g,it.code))).length,0)
+    const b = document.createElement('button')
+    b.className = 'tab' + (cls===currentCls?' active':'') + (n>0?' sel':'')
+    b.onclick = ()=>{ currentCls = cls; renderTree(); renderTabs() }
+    b.innerHTML = `<span>第${cls.classNo}类</span>${n?`<span class="cnt">${n}</span>`:''}`
+    tabsEl.appendChild(b)
+  })
+}
+
+/* ---------- 当前大类渲染 ---------- */
+function renderTree(){
+  if(!currentCls){ treeEl.innerHTML='<div style="color:#888">无数据</div>'; return }
+  titleEl.textContent = currentCls.className
+  const cls = currentCls
+  const keyword = searchEl.value.trim().toLowerCase()
+  let visible = 0
+  treeEl.innerHTML = ''
+
+  const clsDiv = document.createElement('div')
+  clsDiv.className = 'tree-item'
+
+  cls.groups.forEach(gr=>{
+    // 过滤
+    const titleMatch = !keyword || gr.groupTitle.includes(keyword)
+    let grItems = gr.items.filter(it=>!keyword || it.name.toLowerCase().includes(keyword)||it.code.includes(keyword)||titleMatch)
+    if(keyword && titleMatch && grItems.length===0) grItems = gr.items
+    if(keyword && grItems.length===0 && !titleMatch) return
+    // 只看已选
+    if(curOnly) grItems = grItems.filter(it=>selected.has(keyOf(cls,gr.g,it.code)))
+    if(grItems.length===0 && !curOnly) return
+
+    // 类似群行
+    const grBar = document.createElement('div')
+    grBar.className = 'group-title'
+    const grCheck = document.createElement('input')
+    grCheck.type='checkbox'
+    const gkeys = gr.items.map(it=>keyOf(cls,gr.g,it.code))
+    grCheck.checked = gkeys.length>0 && gkeys.every(k=>selected.has(k))
+    grCheck.indeterminate = !grCheck.checked && gkeys.some(k=>selected.has(k))
+    grCheck.style.visibility = curOnly ? 'hidden':''
+    grCheck.onchange = e=>{
+      gr.items.forEach(it=>applySelect(cls,gr,it,e.target.checked))
+      renderTree(); renderResult(); renderTabs()
+    }
+    grBar.appendChild(grCheck)
+    grBar.append(gr.groupTitle)
+    clsDiv.appendChild(grBar)
+
+    grItems.forEach(it=>{
+      const k = keyOf(cls,gr.g,it.code)
+      const row = document.createElement('div')
+      row.className = 'item'
+      const cb = document.createElement('input')
+      cb.type='checkbox'
+      cb.checked = selected.has(k)
+      cb.onchange = e=>{
+        applySelect(cls,gr,it,e.target.checked)
+        renderTree(); renderResult(); renderTabs()
+      }
+      row.appendChild(cb)
+      row.append(`【${gr.g}】${it.code} ${it.name}`)
+      clsDiv.appendChild(row)
+      visible++
+    })
+  })
+  treeEl.appendChild(clsDiv)
+  treeCnt.textContent = curOnly? (`已选 ${visible} 项`) : (keyword? `匹配 ${visible} 项`:'')
+}
+
+/* ---------- 汇总 ---------- */
+function renderResult(){
+  const group = {}
+  for(const item of selected.values()){
+    if(!group[item.classNo]) group[item.classNo] = {title:item.className,list:[]}
+    group[item.classNo].list.push(item)
+  }
+  const keys = Object.keys(group).sort((a,b)=>a-b)
+  let html=''
+  for(const k of keys){
+    html += `<div style="margin:8px 0"><strong>${group[k].title}</strong>（${group[k].list.length}）<ul style="margin:4px 0 12px 16px">`
+    group[k].list.sort((a,b)=> a.g.localeCompare(b.g)||a.code.localeCompare(b.code)).forEach(it=>{
+      html += `<li><input type="checkbox" checked onclick="this.remove()"> <span>【${it.g} ${it.groupTitle}】${it.code} ${it.name}</span></li>`
+    })
+    html += `</ul></div>`
+  }
+  resEl.innerHTML = html || "<div style='color:#888'>勾选左侧小类，此处自动汇总</div>"
+  countEl.textContent = `共 ${selected.size} 个小类`
+  refreshButtons()
+  saveSelected()
+}
+
+function clearAll(){
+  selected.clear(); curOnly=false; searchEl.value=''
+  saveSelected()
+  renderTree(); renderResult(); renderTabs()
+}
+function toggleCurOnly(){
+  curOnly = !curOnly; renderTree()
+  document.getElementById('curOnlyBtn').textContent = curOnly?'显示全部':'只看已选'
+}
+
+/* ---------- 导出 ---------- */
+function download(filename, content, mime){
+  const blob = new Blob([content], {type:mime})
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a'); a.href=url; a.download=filename
+  document.body.appendChild(a); a.click()
+  setTimeout(()=>{URL.revokeObjectURL(url); a.remove()},100)
+}
+
+function exportJSON(){
+  const out = buildStructured()
+  download('商标已选类目.json', JSON.stringify(out,null,2), 'application/json')
+}
+function exportTXT(){
+  const group={}
+  for(const it of selected.values()){
+    if(!group[it.classNo]) group[it.classNo]={title:it.className,list:[]}
+    group[it.classNo].list.push(it)
+  }
+  let txt=`商标已选类目清单（共 ${selected.size} 个小类）\n${'='.repeat(50)}\n\n`
+  for(const k of Object.keys(group).sort((a,b)=>a-b)){
+    txt += group[k].title+`（${group[k].list.length}）\n`
+    group[k].list.sort((a,b)=> a.g.localeCompare(b.g)||a.code.localeCompare(b.code)).forEach(it=>{
+      txt += `  - 【${it.g} ${it.groupTitle}】${it.code} ${it.name}\n`
+    })
+    txt+='\n'
+  }
+  download('商标已选类目清单.txt', txt, 'text/plain;charset=utf-8')
+}
+function exportCSV(){
+  const arr=[...selected.values()]
+  arr.sort((a,b)=>(a.classNo-b.classNo)||a.g.localeCompare(b.g)||a.code.localeCompare(b.code))
+  const rows=[['大类编号','大类名称','类似群编码','类似群标题','小类编码','小类名称']]
+  arr.forEach(it=>rows.push([it.classNo,it.className,it.g,it.groupTitle,it.code,it.name]))
+  const csv=rows.map(r=>r.map(c=>{ c=(c==null?'':String(c)); return /[",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c }).join(',')).join('\n')
+  download('商标已选类目.csv','\uFEFF'+csv,'text/csv;charset=utf-8')
+}
+function copyResult(){
+  if(!selected.size){ alert('请先勾选'); return }
+  let txt=''
+  for(const it of selected.values()) txt += `【${it.g} ${it.groupTitle}】${it.code} ${it.name}\n`
+  navigator.clipboard? navigator.clipboard.writeText(txt).then(()=>alert('已复制')) : (()=>{})()
+}
+function buildStructured(){
+  const map={}
+  for(const it of selected.values()){
+    if(!map[it.classNo]) map[it.classNo]={classNo:it.classNo,className:it.className,groups:{}}
+    if(!map[it.classNo].groups[it.g]) map[it.classNo].groups[it.g]={g:it.g,groupTitle:it.groupTitle,items:[]}
+    map[it.classNo].groups[it.g].items.push({code:it.code,name:it.name})
+  }
+  const classes=Object.keys(map).sort((a,b)=>a-b).map(no=>{
+    const c=map[no], groups=[]
+    Object.keys(c.groups).sort().forEach(g=>{ const gi=c.groups[g]; gi.items.sort((x,y)=>x.code.localeCompare(y.code)); groups.push({g:gi.g,groupTitle:gi.groupTitle,items:gi.items}) })
+    return {classNo:+no,className:c.className,groups}
+  })
+  return {exportedAt:new Date().toISOString(), totalItems:selected.size, classes}
+}
+function refreshButtons(){
+  const on=selected.size>0
+  ;['btnJson','btnTxt','btnCsv'].forEach(id=>{ document.getElementById(id).disabled=!on })
+}
+
+/* ---------- 启动：先读缓存（秒开），无缓存再逐个 fetch ---------- */
+function setData(list){
+  data.length=0
+  list.forEach(c=>{ if(c && c.classNo!=null && c.groups) data.push(c) })
+  data.sort((a,b)=>a.classNo-b.classNo)
+}
+function kickRender(){
+  if(!currentCls && data.length) currentCls = data[0]
+  renderTabs(); renderTree(); renderResult()
+}
+function boot(){
+  const status = document.getElementById('loadStatus')
+  // 1) 恢复已选
+  loadSelected()
+  // 2) 读数据缓存
+  const cache = readDataCache()
+  if(cache && cache.length){
+    setData(cache)
+    status.textContent = `✅ 已从缓存加载 ${data.length} 个大类`
+    kickRender()
+    return
+  }
+  // 3) 逐个 fetch 34 类目文件
+  ;(async function(){
+    const already={}, list=[]
+    for(let i=1;i<=45;i++){
+      const names=[`${String(i).padStart(2,'0')}.json`, `${i}.json`]
+      for(const f of names){
+        if(already[i])break
+        try{
+          const r=await fetch('data/'+f)
+          if(r.ok){
+            const obj=await r.json()
+            if(obj && obj.classNo!=null && !already[i]){
+              already[i]=1; list.push(obj); saveDataCache(list)
+              status.textContent=`加载 ${i}/45 ⏳`
+            }
+          }
+        }catch(e){}
+      }
+    }
+    setData(list); saveDataCache(data)
+    if(!data.length) status.textContent='⚠️ data/ 无类目文件'
+    else status.textContent=`✅ 已加载 ${data.length} 个大类`
+    kickRender()
+  })()
+}
+
+// ---- 启动 ----
+window.clearAll=clearAll; window.toggleCurOnly=toggleCurOnly
+window.exportJSON=exportJSON; window.exportTXT=exportTXT; window.exportCSV=exportCSV
+window.copyResult=copyResult
+searchEl.addEventListener('input', renderTree)
+boot()
+</script>
+</body>
+</html>
