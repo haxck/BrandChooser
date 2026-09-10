@@ -94,6 +94,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
     <h3 id="panelTitle">选择小类</h3>
     <input class="search" id="search" placeholder="搜索编码 / 名称 / 类似群">
     <div class="ctrl-bar">
+      <button onclick="clearClass()" class="ghost">清空当前类</button>
       <button onclick="clearAll()" class="ghost">清空全部</button>
       <button onclick="toggleCurOnly()" class="ghost" id="curOnlyBtn">只看已选</button>
       <span class="count" id="treeCount"></span>
@@ -291,6 +292,17 @@ function clearAll(){
   saveSelected()
   renderTree(); renderResult(); renderTabs()
 }
+/* 只清空当前正在操作的大类，不影响其他类 */
+function clearClass(){
+  const no = currentNo
+  if(no==null){ return }
+  for(const k of [...selected.keys()]){
+    if(selected.get(k).classNo === no) selected.delete(k)
+  }
+  curOnly=false
+  saveSelected()
+  renderTree(); renderResult(); renderTabs()
+}
 function toggleCurOnly(){
   curOnly = !curOnly; renderTree()
   document.getElementById('curOnlyBtn').textContent = curOnly?'显示全部':'只看已选'
@@ -381,7 +393,7 @@ function boot(){
 }
 
 // ---- 启动 ----
-window.clearAll=clearAll; window.toggleCurOnly=toggleCurOnly
+window.clearAll=clearAll; window.clearClass=clearClass; window.toggleCurOnly=toggleCurOnly
 window.exportJSON=exportJSON; window.exportTXT=exportTXT; window.exportCSV=exportCSV
 window.copyResult=copyResult; window.showPanel=showPanel
 searchEl.addEventListener('input', renderTree)
