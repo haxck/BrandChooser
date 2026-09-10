@@ -2,7 +2,8 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>商标类目勾选筛选器（按大类分页）</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>商标类目选勾器（可分大类，手机可用）</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:system-ui, sans-serif}
 body{display:flex;flex-direction:column;height:100vh;padding:12px;gap:12px;background:#f5f7fa}
@@ -47,6 +48,30 @@ button:disabled{opacity:.5;cursor:not-allowed}
 #result ul{list-style:none}
 #result li{padding:2px 0;font-size:13px;display:flex;gap:6px;align-items:center}
 .all-sum{font-size:12px;color:#888;margin-top:10px}
+
+/* ===== 移动端响应式 ===== */
+.mobile-nav{display:none}
+@media (max-width: 900px){
+  body{padding:8px;gap:8px}
+  .topbar h1{font-size:16px}
+  /* 移动端：两栏变两页，靠底部导航切换 */
+  .main{display:block;overflow:hidden}
+  .panel.left,.panel.right{width:100%;height:100%;border:1px solid #e5e7eb}
+  .panel.right{display:none}
+  .main.show-result .panel.left{display:none}
+  .main.show-result .panel.right{display:block}
+  /* 底部导航 */
+  .mobile-nav{display:flex;position:sticky;top:0;z-index:20;gap:8px;padding:6px 0;background:#fff;border-bottom:1px solid #e5e7eb;margin-bottom:4px}
+  .mobile-nav button{flex:1;padding:10px 0;font-size:14px}
+  .mobile-nav button.on{background:#2563eb;color:#fff;border-color:#2563eb}
+  .mobile-nav button:not(.on){background:#fff;color:#2563eb;border:1px solid #c7d2fe}
+  .ctrl-bar button{padding:9px 12px}
+  .item label{min-height:34px;padding:9px 8px;font-size:14px}
+  .group-title label{padding:9px 8px}
+  .search{padding:10px;font-size:15px}
+  .tabs{max-height:120px;overflow-y:auto}
+  .panel{padding:12px}
+}
 </style>
 </head>
 <body>
@@ -56,6 +81,11 @@ button:disabled{opacity:.5;cursor:not-allowed}
 </div>
 <!-- 按大类分页 Tab -->
 <div class="tabs" id="tabs"></div>
+<!-- 移动端：选择 / 已选 切换导航 -->
+<div class="mobile-nav">
+  <button id="mvSel" class="on" onclick="showPanel('sel')">☰ 选择小类</button>
+  <button id="mvRes" onclick="showPanel('res')">📋 已选清单 (<span id="mvCount">0</span>)</button>
+</div>
 
 <div class="main">
   <!-- 左侧：当前大类的分类树 -->
@@ -72,11 +102,11 @@ button:disabled{opacity:.5;cursor:not-allowed}
 
   <!-- 中间/右侧：导航（可不必要，顶部已有 Tab）占位隐藏 -->
   <div class="panel right">
-    <h3>✅ 已选类目（全部大类汇总）</h3>
+    <h3>已选类目（全部大类汇总）</h3>
     <div class="ctrl-bar">
-      <button class="btn-json" id="btnJson" onclick="exportJSON()">⬇ JSON</button>
-      <button class="btn-txt"  id="btnTxt"  onclick="exportTXT()">⬇ TXT</button>
-      <button class="btn-csv"  id="btnCsv"  onclick="exportCSV()">⬇ CSV</button>
+      <button class="btn-json" id="btnJson" onclick="exportJSON()">JSON</button>
+      <button class="btn-txt"  id="btnTxt"  onclick="exportTXT()">TXT</button>
+      <button class="btn-csv"  id="btnCsv"  onclick="exportCSV()">CSV</button>
       <button class="secondary" onclick="copyResult()">复制清单</button>
     </div>
     <div id="resultCount" class="count"></div>
@@ -103,6 +133,7 @@ const searchEl = document.getElementById('search')
 const tabsEl   = document.getElementById('tabs')
 const titleEl  = document.getElementById('panelTitle')
 const statusEl = document.getElementById('loadStatus')
+const mvCountEl = document.getElementById('mvCount')
 
 const keyOf = (cno,g,code)=> `${cno}-${g}-${code}`
 
@@ -118,15 +149,15 @@ function applySelect(cls, gr, it, on){
    ============================================================ */
 async function openClass(no){
   if(data.has(no)){ setCurrent(no); renderTree(); renderTabs(); return }
-  statusEl.textContent = `⏳ 加载第${no}类…`
+  statusEl.textContent = `加载第${no}类…`
   let cls=null
   try{
     let r = await fetch(`data/${String(no).padStart(2,'0')}.json`)
     if(!r.ok) r = await fetch(`data/${no}.json`)
     if(r.ok){ cls = await r.json(); data.set(no, cls) }
   }catch(e){}
-  if(!cls){ statusEl.textContent=`⚠️ 第${no}类加载失败`; return }
-  statusEl.textContent='✅ 已缓存到内存'
+  if(!cls){ statusEl.textContent=`第${no}类加载失败`; return }
+  statusEl.textContent='已缓存'
   setCurrent(no); renderTree(); renderTabs(); renderResult()
 }
 function setCurrent(no){ if(data.has(no)) currentNo = no }
@@ -249,6 +280,7 @@ function renderResult(){
   }
   resEl.innerHTML = html || "<div style='color:#888'>勾选左侧小类，此处自动汇总</div>"
   countEl.textContent = `共 ${selected.size} 个小类`
+  mvCountEl.textContent = selected.size
   refreshButtons()
   saveSelected()
 }
@@ -325,10 +357,19 @@ function refreshButtons(){
   ;['btnJson','btnTxt','btnCsv'].forEach(id=>{ document.getElementById(id).disabled=!on })
 }
 
+/* 移动端：切换 选择 / 已选 两个面板 */
+function showPanel(which){
+  const main = document.querySelector('.main')
+  const on = which==='res'
+  main.classList.toggle('show-result', on)
+  document.getElementById('mvSel').classList.toggle('on', !on)
+  document.getElementById('mvRes').classList.toggle('on', on)
+}
+
 /* ---------- 启动：秒开，不预取任何类目 ---------- */
 function boot(){
   loadSelected()               // 恢复已选（轻量）
-  statusEl.textContent = '✅ 就绪：点击上方大类开始（按需加载）'
+  statusEl.textContent = '就绪'
   renderTabs()
   renderResult()
   // 若已有已选，默认打开第一个被选的大类方便回看
@@ -341,7 +382,7 @@ function boot(){
 // ---- 启动 ----
 window.clearAll=clearAll; window.toggleCurOnly=toggleCurOnly
 window.exportJSON=exportJSON; window.exportTXT=exportTXT; window.exportCSV=exportCSV
-window.copyResult=copyResult
+window.copyResult=copyResult; window.showPanel=showPanel
 searchEl.addEventListener('input', renderTree)
 boot()
 </script>
