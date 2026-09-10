@@ -275,7 +275,7 @@ function renderResult(){
   for(const k of keys){
     html += `<div style="margin:8px 0"><strong>${group[k].title}</strong>（${group[k].list.length}）<ul style="margin:4px 0 12px 16px">`
     group[k].list.sort((a,b)=> a.g.localeCompare(b.g)||a.code.localeCompare(b.code)).forEach(it=>{
-      html += `<li><input type="checkbox" checked onclick="this.remove()"> <span>【${it.g} ${it.groupTitle}】${it.code} ${it.name}</span></li>`
+      html += `<li><span>【${it.g} ${it.groupTitle}】${it.code} ${it.name}</span></li>`
     })
     html += `</ul></div>`
   }
