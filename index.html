@@ -36,7 +36,13 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .tree-item{margin:8px 0}
 .class-title{font-weight:600;cursor:pointer;padding:4px 0;display:flex;gap:6px;align-items:center}
 .group-title{font-weight:500;color:#333;margin:8px 0 4px 18px;display:flex;gap:6px;align-items:center}
-.item{margin-left:34px;padding:3px 0;color:#555;font-size:13px;display:flex;gap:6px;align-items:center}
+.group-title label{display:flex;gap:6px;align-items:center;cursor:pointer;padding:6px 8px;border-radius:6px;flex:1;user-select:none}
+.group-title label:hover{background:#f0f6ff}
+.item{margin-left:18px;color:#444;font-size:13px;display:flex;gap:6px;align-items:center;border-radius:6px;margin-bottom:2px}
+.item label{display:flex;gap:8px;align-items:center;cursor:pointer;padding:7px 8px;flex:1;user-select:none;border-radius:6px;min-height:30px}
+.item label:hover{background:#eef4ff}
+.item.sel label{background:#eef2ff}
+.item label input{flex:none;width:18px;height:18px;cursor:pointer;accent-color:#2563eb}
 .only-selected{font-size:12px;color:#2563eb;cursor:pointer;user-select:none}
 #result ul{list-style:none}
 #result li{padding:2px 0;font-size:13px;display:flex;gap:6px;align-items:center}
@@ -180,39 +186,43 @@ function renderTree(){
     if(keyword && titleMatch && grItems.length===0) grItems = gr.items
     if(keyword && grItems.length===0 && !titleMatch) return
     // 只看已选
-    if(curOnly) grItems = grItems.filter(it=>selected.has(keyOf(cls,gr.g,it.code)))
+    if(curOnly) grItems = grItems.filter(it=>selected.has(keyOf(cls.classNo,gr.g,it.code)))
     if(grItems.length===0 && !curOnly) return
 
-    // 类似群行
-    const grBar = document.createElement('div')
-    grBar.className = 'group-title'
+    // 类似群行（label 包裹，点击文字也能勾选）
+    const gkeys = gr.items.map(it=>keyOf(cls.classNo,gr.g,it.code))
+    const grLabel = document.createElement('label')
     const grCheck = document.createElement('input')
     grCheck.type='checkbox'
-    const gkeys = gr.items.map(it=>keyOf(cls,gr.g,it.code))
     grCheck.checked = gkeys.length>0 && gkeys.every(k=>selected.has(k))
     grCheck.indeterminate = !grCheck.checked && gkeys.some(k=>selected.has(k))
-    grCheck.style.visibility = curOnly ? 'hidden':''
+    if(curOnly) grCheck.disabled = true
     grCheck.onchange = e=>{
       gr.items.forEach(it=>applySelect(cls,gr,it,e.target.checked))
       renderTree(); renderResult(); renderTabs()
     }
-    grBar.appendChild(grCheck)
-    grBar.append(gr.groupTitle)
+    grLabel.appendChild(grCheck)
+    grLabel.append(gr.groupTitle)
+    const grBar = document.createElement('div')
+    grBar.className = 'group-title'
+    grBar.appendChild(grLabel)
     clsDiv.appendChild(grBar)
 
     grItems.forEach(it=>{
-      const k = keyOf(cls,gr.g,it.code)
+      const k = keyOf(cls.classNo,gr.g,it.code)
       const row = document.createElement('div')
-      row.className = 'item'
+      row.className = 'item' + (selected.has(k)?' sel':'')
+      const lbl = document.createElement('label')
       const cb = document.createElement('input')
       cb.type='checkbox'
       cb.checked = selected.has(k)
       cb.onchange = e=>{
         applySelect(cls,gr,it,e.target.checked)
-        renderTree(); renderResult(); renderTabs()
+        renderTree(); renderResult(); renderTabs();
       }
-      row.appendChild(cb)
-      row.append(`【${gr.g}】${it.code} ${it.name}`)
+      lbl.appendChild(cb)
+      lbl.append(`【${gr.g}】${it.code} ${it.name}`)
+      row.appendChild(lbl)
       clsDiv.appendChild(row)
       visible++
     })
