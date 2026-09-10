@@ -340,9 +340,9 @@ function exportTXT(){
 function exportCSV(){
   const arr=[...selected.values()]
   arr.sort((a,b)=>(a.classNo-b.classNo)||a.g.localeCompare(b.g)||a.code.localeCompare(b.code))
-  const rows=[['大类编号','大类名称','类似群编码','类似群标题','小类编码','小类名称']]
-  arr.forEach(it=>rows.push([it.classNo,it.className,it.g,it.groupTitle,it.code,it.name]))
-  const csv=rows.map(r=>r.map(c=>{ c=(c==null?'':String(c)); return /[",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c }).join(',')).join('\n')
+  const rows=[['序号','商品类别','类似群','商品名称']]
+  arr.forEach((it,i)=>rows.push([i+1, it.classNo, it.g, it.name]))
+  const csv=rows.map(r=>r.map(c=>{ c=(c==null?'':String(c)); return /[\",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c }).join(',')).join('\n')
   download('商标已选类目.csv','\uFEFF'+csv,'text/csv;charset=utf-8')
 }
 function copyResult(){
