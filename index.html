@@ -106,9 +106,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
   <div class="panel right">
     <h3>已选类目（全部大类汇总）</h3>
     <div class="ctrl-bar">
-      <button class="btn-json" id="btnJson" onclick="exportJSON()">JSON</button>
-      <button class="btn-txt"  id="btnTxt"  onclick="exportTXT()">TXT</button>
-      <button class="btn-csv"  id="btnCsv"  onclick="exportCSV()">CSV</button>
+      <button class="btn-csv"  id="btnCsv"  onclick="exportCSV()">导出为 CSV</button>
       <button class="secondary" onclick="copyResult()">复制清单</button>
     </div>
     <div id="resultCount" class="count"></div>
@@ -317,26 +315,6 @@ function download(filename, content, mime){
   setTimeout(()=>{URL.revokeObjectURL(url); a.remove()},100)
 }
 
-function exportJSON(){
-  const out = buildStructured()
-  download('商标已选类目.json', JSON.stringify(out,null,2), 'application/json')
-}
-function exportTXT(){
-  const group={}
-  for(const it of selected.values()){
-    if(!group[it.classNo]) group[it.classNo]={title:it.className,list:[]}
-    group[it.classNo].list.push(it)
-  }
-  let txt=`商标已选类目清单（共 ${selected.size} 个小类）\n${'='.repeat(50)}\n\n`
-  for(const k of Object.keys(group).sort((a,b)=>a-b)){
-    txt += group[k].title+`（${group[k].list.length}）\n`
-    group[k].list.sort((a,b)=> a.g.localeCompare(b.g)||a.code.localeCompare(b.code)).forEach(it=>{
-      txt += `  - 【${it.g} ${it.groupTitle}】${it.code} ${it.name}\n`
-    })
-    txt+='\n'
-  }
-  download('商标已选类目清单.txt', txt, 'text/plain;charset=utf-8')
-}
 function exportCSV(){
   const arr=[...selected.values()]
   arr.sort((a,b)=>(a.classNo-b.classNo)||a.g.localeCompare(b.g)||a.code.localeCompare(b.code))
