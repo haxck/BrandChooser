@@ -1,5 +1,6 @@
 <script lang="ts">
   import { store } from './lib/store.svelte';
+  import './app.css'
 </script>
 
 <main>
