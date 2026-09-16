@@ -1,72 +1,13 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>商标类目选勾器</title>
-<link rel="stylesheet" href="src/style/style.css">
-</head>
-<body>
-<div class="topbar">
-  <h1>商标类目选勾器</h1>
-  <span class="load-status" id="loadStatus">加载中…</span>
-</div>
-<!-- 按大类分页 Tab -->
-<div class="tabs" id="tabs"></div>
-<!-- 移动端：选择 / 已选 切换导航 -->
-<div class="mobile-nav">
-  <button id="mvSel" class="on" onclick="showPanel('sel')">☰ 选择小类</button>
-  <button id="mvRes" onclick="showPanel('res')">已选清单 (<span id="mvCount">0</span>)</button>
-</div>
-
-<div class="main">
-  <!-- 左侧：当前大类的分类树 -->
-  <div class="panel left">
-    <h3 id="panelTitle">选择小类</h3>
-    <input class="search" id="search" placeholder="搜索编码 / 名称 / 类似群">
-    <div class="ctrl-bar">
-      <button onclick="clearClass()" class="ghost">清空当前类</button>
-      <button onclick="clearAll()" class="ghost">清空全部</button>
-      <button onclick="toggleCurOnly()" class="ghost" id="curOnlyBtn">只看已选</button>
-      <span class="count" id="treeCount"></span>
-    </div>
-    <div id="tree"></div>
-  </div>
-
-  <!-- 中间/右侧：导航（可不必要，顶部已有 Tab）占位隐藏 -->
-  <div class="panel right">
-    <h3>已选类目（全部大类汇总）</h3>
-    <div class="ctrl-bar">
-      <button class="btn-csv"  id="btnCsv"  onclick="exportCSV()">导出为 CSV</button>
-      <button class="secondary" onclick="copyResult()">复制清单</button>
-    </div>
-    <div id="resultCount" class="count"></div>
-    <div id="result"></div>
-  </div>
-</div>
-
-<script src="src/script/index.js"></script>
-<!-- <script>
-  window.onload((e)=>{
-    function boot(){
-      loadSelected()               // 恢复已选（轻量）
-      statusEl.textContent = '就绪'
-      renderTabs()
-      renderResult()
-      // 若已有已选，默认打开第一个被选的大类方便回看
-      const first = [...selected.values()]
-        .map(v=>v.classNo).sort((a,b)=>a-b)[0]
-      if(first) openClass(first)
-      else renderTree()
-    }
-
-    // ---- 启动 ----
-    window.clearAll=clearAll; window.clearClass=clearClass; window.toggleCurOnly=toggleCurOnly
-    window.exportCSV=exportCSV
-    window.copyResult=copyResult; window.showPanel=showPanel
-    searchEl.addEventListener('input', renderTree)
-    boot()
-  })
-</script> -->
-</body>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>商标申请选择器</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
 </html>
