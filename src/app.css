@@ -1,1 +1,39 @@
 @import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+      "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+      sans-serif;
+    background-color: #ffffff;
+    color: #1a1a1a;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* 简洁线条风格滚动条 */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #c8c8c8;
+    border: 3px solid #ffffff;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #9b9b9b;
+    background-clip: content-box;
+  }
+
+  /* 去掉 checkbox 默认外圈的按钮，保持干净 */
+  input[type="checkbox"] {
+    border: 1px solid #9ca3af;
+    border-radius: 2px;
+  }
+  input[type="checkbox"]:checked {
+    border-color: #171717;
+  }
+}
