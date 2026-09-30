@@ -33,7 +33,7 @@
     </div>
   {:then data}
     <!-- 置顶信息卡 -->
-    <div class="lg:sticky lg:top-14 lg:z-40 border border-slate-300 bg-white">
+    <div class="lg:sticky lg:top-14 z-20 border border-l-0 border-t-0 border-slate-300 bg-white">
       <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
         <div class="flex min-w-0 items-center gap-3">
           <span class="w-8 shrink-0 text-center font-mono text-lg font-bold text-slate-900">{data.classNo}</span>
@@ -70,7 +70,7 @@
       {#each data.groups as group}
         {#if groupVisible(group)}
           {@const open = keyword.trim() ? true : !collapsed.has(group.g)}
-          <div class="mb-2 border border-slate-300 bg-white">
+          <div class="mb-2 border border-l-0 border-slate-300 bg-white">
             <button
               onclick={() => toggleCollapse(group.g)}
               class="flex w-full items-center justify-between gap-3 border-b border-slate-200 px-4 py-2.5 text-left hover:bg-slate-50 {open ? '' : 'border-b-0'}"
