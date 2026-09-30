@@ -76,7 +76,6 @@
               class="flex w-full items-center justify-between gap-3 border-b border-slate-200 px-4 py-2.5 text-left hover:bg-slate-50 {open ? '' : 'border-b-0'}"
             >
               <div class="flex min-w-0 items-center gap-3">
-                <span class="w-4 shrink-0 font-mono text-xs text-slate-400">{open ? '▾' : '▸'}</span>
                 <span class="shrink-0 font-mono text-xs font-semibold text-slate-600">{group.g}</span>
                 <span class="truncate text-sm text-slate-800">{group.groupTitle}</span>
                 {#if groupCount(data.classNo, group) > 0}
