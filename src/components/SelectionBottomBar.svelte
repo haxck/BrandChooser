@@ -15,5 +15,6 @@
       已选 <b class="font-mono">{store.selectedClassNoCount} 类，共 {store.totalSelected} 项</b>
       <span class="border border-slate-300 px-2 py-0.5 text-xs text-slate-500 hover:border-slate-900 hover:text-slate-900">查看 / 导出</span>
     </button>
+    <p class="text-sm text-slate-400">&COPY;<a class="hover:text-slate-600" href="https://haxck.com">haxck</a></p>
   </div>
 </div>
