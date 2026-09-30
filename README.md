@@ -1,4 +1,4 @@
-# Brand Class Chooser
+# TradeMark Chooser
 一个专为商标注册申请提供的类别筛选导出工具，方便注册申请。
 
 目前提供：
